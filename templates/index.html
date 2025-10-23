@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>メモアプリへようこそ</h1>
+        <a href="/regist" role="button">新規メモ登録</a>
+        <a href="/logout" role="button">ログアウト</a>
+        <article>
+            <section>
+                <h2>はじめに</h2>
+                <p>このアプリはメモを簡単に管理するためのものです。</p>
+            </section>
+            <section>
+                <h2>使い方</h2>
+                <p>新しいメモを追加したり、既存のメモを編集・削除したりできます。</p>
+            </section>
+        </article>
+        <p>##################################</p>
+        {% if memo_list == [] %}
+            <p>メモは登録されていません。</p>
+        {% else %}
+            <table border="1">
+                <tr>
+                    <th>タイトル</th>
+                    <th>メモ</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            {% for memo in memo_list %}
+                <tr>
+                    <td>{{ memo.title }}</td>
+                    <td>{{ memo.body }}</td>
+                    <td>
+                        <a href="/{{ memo.id }}/edit" role="button">編集</a>
+                    </td>
+                    <td>
+                        <a href="/{{ memo.id }}/delete" role="button">削除</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </table>
+        {% endif %}
+{% endblock %}

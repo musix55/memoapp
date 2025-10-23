@@ -1,0 +1,101 @@
+from flask import Flask, redirect, render_template, g, request
+import sqlite3
+from flask_login import UserMixin, LoginManager, login_required, login_user, logout_user
+import os
+DATABASE = "flaskmemo.db"
+
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+class User(UserMixin):
+    def __init__(self, userid):
+        self.id = userid
+
+# ログイン
+@login_manager.user_loader
+def load_user(userid):
+    return User(userid)
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    return redirect('/login')
+
+@app.route("/logout", methods=['GET'])
+@login_required
+def logout():
+    logout_user()
+    return redirect('/login')
+
+@app.route("/login", methods=['GET', 'POST'])
+def login():
+    error_message = ""
+    userid = ""
+
+    if request.method == 'POST':
+        userid = request.form.get('userid')
+        password = request.form.get('password')
+    
+        if userid == 'admin' and password == 'password':
+            user = User(userid)
+            login_user(user)
+            return redirect('/')
+        else:
+            error_message = "入力されたIDもしくはパスワードが誤っています"
+
+    return render_template('login.html', error_message=error_message, userid=userid)
+
+# ルートパス
+@app.route("/")
+@login_required
+def top():
+    memo_list = get_db().execute('select id, title, body from memo;').fetchall()
+    return render_template('index.html', memo_list=memo_list)
+
+@app.route("/regist", methods=['GET', 'POST'])
+def regist():
+    if request.method == 'POST':
+        title = request.form.get('newtitle')
+        body = request.form.get('newbody')
+        get_db().execute('insert into memo (title, body) values (?, ?);', (title, body))
+        get_db().commit()
+        return redirect('/')
+    return render_template('regist.html')
+
+@app.route("/<id>/edit", methods=['GET', 'POST'])
+def edit(id):
+    if request.method == 'POST':
+        title = request.form.get('newtitle')
+        body = request.form.get('newbody')
+        get_db().execute('update memo set title = ?, body = ? where id = ?;', (title, body, id))
+        get_db().commit()
+        return redirect('/')
+
+    db = get_db()
+    post = db.execute('select id, title, body from memo where id = ?;', (id,)).fetchone()
+    return render_template('edit.html', post=post)
+
+@app.route("/<id>/delete", methods=['GET', 'POST'])
+def delete(id):
+    if request.method == 'POST':
+        get_db().execute('delete from memo where id = ?;', (id,))
+        get_db().commit()
+        return redirect('/')
+
+    db = get_db()
+    post = db.execute('select id, title, body from memo where id = ?;', (id,)).fetchone()
+    return render_template('delete.html', post=post)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+# Database connection
+def connect_db():
+    rv = sqlite3.connect(DATABASE)
+    rv.row_factory = sqlite3.Row
+    return rv
+
+def get_db():
+    if not hasattr(g, 'sqlite_db'):
+        g.sqlite_db = connect_db()
+    return g.sqlite_db
