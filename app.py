@@ -2,6 +2,7 @@ from flask import Flask, redirect, render_template, g, request
 import sqlite3
 from flask_login import UserMixin, LoginManager, login_required, login_user, logout_user
 import os
+from werkzeug.security import generate_password_hash, check_password_hash
 DATABASE = "flaskmemo.db"
 
 app = Flask(__name__)
@@ -21,6 +22,26 @@ def load_user(userid):
 def unauthorized_callback():
     return redirect('/login')
 
+@app.route("/signup", methods=['GET', 'POST'])
+def signup():
+    error_message = ""
+
+    if request.method == 'POST':
+        userid = request.form.get('userid')
+        password = request.form.get('password')
+        pass_hash = generate_password_hash(password)
+
+        db = get_db()
+        user_check = db.execute('select userid from user where userid = ?;', (userid,)).fetchone()
+        if user_check is None:
+            db.execute('insert into user (userid, password) values (?, ?);', (userid, pass_hash))
+            db.commit()
+            return redirect('/login')
+        else:
+            error_message = "入力されたIDは既に使用されています"
+
+    return render_template('signup.html', error_message=error_message)
+
 @app.route("/logout", methods=['GET'])
 @login_required
 def logout():
@@ -35,13 +56,19 @@ def login():
     if request.method == 'POST':
         userid = request.form.get('userid')
         password = request.form.get('password')
-    
-        if userid == 'admin' and password == 'password':
-            user = User(userid)
-            login_user(user)
-            return redirect('/')
+
+        db = get_db()
+        user_record = db.execute('select userid, password from user where userid = ?;', (userid,)).fetchone()
+        if user_record is None:
+            error_message = "入力されたIDは存在しません"
         else:
-            error_message = "入力されたIDもしくはパスワードが誤っています"
+            stored_hash = user_record['password']
+            if check_password_hash(stored_hash, password):
+                user = User(userid)
+                login_user(user)
+                return redirect('/')
+            else:
+                error_message = "入力されたIDまたはパスワードが誤っています"
 
     return render_template('login.html', error_message=error_message, userid=userid)
 
